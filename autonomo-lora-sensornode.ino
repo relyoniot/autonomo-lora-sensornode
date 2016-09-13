@@ -1,5 +1,5 @@
 // TODO
-// powersaving: decrese sensor interval, decrese send interval
+// powersaving: decrese sensor interval, decrese send interval, disable charge led
 
 #include <Sodaq_RN2483.h>
 #include <StringLiterals.h>
@@ -62,6 +62,12 @@ Adafruit_BME280 bme; // I2C
 //RTC
 RTCZero rtc;
 
+// global counter
+unsigned int count = 0;
+unsigned int runminute = 1;
+unsigned int runminutetmp = 1;
+
+
 void setup()
 {
   // Startup delay, do NOT remove!
@@ -111,19 +117,23 @@ void loop()
   DPRINTLN("Humidity: " + String(humidity, DEC) + " %");
   DPRINTLN("Temperature: " + String(celcius, DEC) + " Celcius");
   DPRINTLN("Battery: " + String(mv, DEC)+ " mv");
+  DPRINTLN("Interval: " + String(runminute, DEC)+ " minute");
   
   // pack in bytes
   uint16_t value1 = (uint16_t)(celcius * 100); // e.g. 2150
   uint16_t value2 = (uint16_t)(humidity * 100); // e.g. 2150
   uint16_t value3 = (uint16_t)(mv);
+  uint16_t value4 = (uint16_t)(runminute);
   
-  uint8_t buf[6];
+  uint8_t buf[8];
   buf[0] = highByte(value1);
   buf[1] = lowByte(value1);
   buf[2] = highByte(value2);
   buf[3] = lowByte(value2);
   buf[4] = highByte(value3);
   buf[5] = lowByte(value3);
+  buf[6] = highByte(value4);
+  buf[7] = lowByte(value4);
   
   // Send packet
 #ifdef DEBUG
@@ -172,8 +182,12 @@ void loop()
 #endif
   // reset wdt
   sodaq_wdt_reset();
-  // wait for nex cycle
-  deepSleep();
+  // wait for next 1 minute cycle
+  while (count < runminute){
+    count++;
+    deepSleep();
+  }
+  count = 0;
 }
 
 void deepSleep() {
@@ -208,13 +222,11 @@ void setupRtc() {
 void setupNetwork() {
   // initialize digital BEE pin as an output.
   pinMode(BEE_VCC, OUTPUT);
-  
   // Turn the LoRaBee off
   digitalWrite(BEE_VCC, LOW);
   sodaq_wdt_safe_delay(500);  
   // Turn the LoRaBee on
   digitalWrite(BEE_VCC, HIGH);
-
   // Connect the LoRabee
   LoRaBee.setDiag(debugSerial);
   Serial1.write("mac set dr 0\r\n");
@@ -231,23 +243,25 @@ void setupNetwork() {
 }
 
 void receiveData() {
-  // After we have send some data, we can receive some data
-  // First we make a buffer
+  // we can only receive data just after we send it
+  // create recieve buffer
   uint8_t payload[64];
-  // Now we fill the buffer and
-  // len = the size of the data
+  // get data
   uint16_t len = LoRaBee.receive(payload, 64);
   String HEXPayload = "";
- 
-  // When there is no payload the lorabee will return 131 (0x83)
-  // I filter this out
+  // if no payload lora will return 131 in payload[0]
   if (payload[0] != 131) {
     for (int i = 0; i < len; i++) {
       HEXPayload += String(payload[i], HEX);
     }
-    debugSerial.println(HEXPayload);
+    DPRINTLN("Received payload");
+    // get only first number
+    runminutetmp = hexchartoint(HEXPayload[1]);
+    if (runminutetmp != 0) {
+      runminute = runminutetmp;
+    }
   } else {
-    debugSerial.println("no payload");
+    DPRINTLN("no payload");
   }
 }
 
@@ -255,4 +269,17 @@ float getRealBatteryVoltage()
 {
   uint16_t batteryVoltage = analogRead(BATVOLTPIN);
   return (ADC_AREF / 1023.0) * (BATVOLT_R1 + BATVOLT_R2) / BATVOLT_R2 * batteryVoltage;
+}
+
+unsigned int hexchartoint(char hex) {
+    if (hex >= '0' && hex <= '9')
+        return hex - '0';
+
+    if (hex >= 'A' && hex <= 'F')
+        return hex - 'A';
+
+    if (hex >= 'a' && hex <= 'f')
+        return hex - 'a';
+
+    return 0;
 }
