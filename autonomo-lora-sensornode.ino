@@ -16,7 +16,7 @@
 #define debugSerial SerialUSB
 #define loraSerial Serial1
 
-// #define DEBUG   //If you comment this line, the DPRINT & DPRINTLN lines are defined as blank.
+#define DEBUG   //If you comment this line, the DPRINT & DPRINTLN lines are defined as blank.
 #ifdef DEBUG
   #define DPRINT(...)    debugSerial.print(__VA_ARGS__)     //DPRINT is a macro, debug print
   #define DPRINTLN(...)  debugSerial.println(__VA_ARGS__)   //DPRINTLN is a macro, debug print with new line
@@ -64,7 +64,7 @@ RTCZero rtc;
 
 // global counter
 unsigned int count = 0;
-unsigned int runminute = 1;
+unsigned int runminute = 6;
 unsigned int runminutetmp = 1;
 
 
