@@ -1,3 +1,8 @@
+
+#include <StringLiterals.h>
+#include <Switchable_Device.h>
+#include <Utils.h>
+
 // TODO
 // powersaving: decrese sensor interval, decrese send interval, disable charge led
 
@@ -64,7 +69,11 @@ RTCZero rtc;
 
 // global counter
 unsigned int count = 0;
-unsigned int runminute = 6;
+#ifdef DEBUG
+  unsigned int runminute = 1;
+#else
+  unsigned int runminute = 6;
+#endif
 unsigned int runminutetmp = 1;
 
 
@@ -193,10 +202,12 @@ void loop()
 void deepSleep() {
    
 #ifdef DEBUG
-  sodaq_wdt_safe_delay(6000);
+  sodaq_wdt_safe_delay(runminute * 10000);
 #else
   // Disable USB
   USB->DEVICE.CTRLA.reg &= ~USB_CTRLA_ENABLE;
+  // lorabee to sleep
+  LoRaBee.sleep();
   // disable wdt
   sodaq_wdt_disable();
   //Enter sleep mode
@@ -204,6 +215,8 @@ void deepSleep() {
   // ...Sleep
   // Enable WDT
   sodaq_wdt_enable(WDT_PERIOD_8X); //9=4s, 10 = 8s, etc
+  // lorabee to wake
+  LoRaBee.wakeUp();
   // Enable USB
   USB->DEVICE.CTRLA.reg |= USB_CTRLA_ENABLE;
 #endif
